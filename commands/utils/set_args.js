@@ -3,6 +3,13 @@ const fs = require("fs");
 const path = require("path");
 const process = require("process");
 
+function write_file(file_path, content) {
+  fs.writeFileSync(file_path, content, function (err) {
+    if (err) throw err;
+    console.log("File Saved at ", file_path);
+  });
+}
+
 function sync_args_from_cmd(args) {
   return new Promise(function (resolve, reject) {
     let rawdata = fs.readFileSync(args["lambdatest-config-file"]);
@@ -42,10 +49,7 @@ function sync_args_from_cmd(args) {
         "<Your LambdaTest access key>"
     ) {
       if (process.env.LT_ACCESS_KEY) {
-        console.log(
-          "setting access key from environment",
-          process.env.LT_ACCESS_KEY
-        );
+        console.log("setting access key from environment");
         lt_config["lambdatest_auth"]["access_key"] = process.env.LT_ACCESS_KEY;
       }
     } else if (
@@ -56,10 +60,7 @@ function sync_args_from_cmd(args) {
       if (!lt_config["lambdatest_auth"]) {
         lt_config["lambdatest_auth"] = {};
       }
-      console.log(
-        "Setting access key from environment",
-        process.env.LT_ACCESS_KEY
-      );
+      console.log("Setting access key from environment");
       lt_config["lambdatest_auth"]["access_key"] = process.env.LT_ACCESS_KEY;
     }
 
@@ -107,10 +108,19 @@ function sync_args_from_cmd(args) {
       }
       lt_config["run_settings"]["envs"] = envs;
     }
-    if ("cypress-env-file" in args) {
+    if (
+      "cypress-env-file" in args ||
+      lt_config["run_settings"]["cypress-env-file"]
+    ) {
       let env_json;
-      if (fs.existsSync(args["cypress-env-file"])) {
-        let raw_env = fs.readFileSync(args["cypress-env-file"]);
+      let file_path;
+      if ("cypress-env-file" in args) {
+        file_path = args["cypress-env-file"];
+      } else {
+        file_path = lt_config["run_settings"]["cypress-env-file"];
+      }
+      if (fs.existsSync(file_path)) {
+        let raw_env = fs.readFileSync(file_path);
         env_json = JSON.parse(raw_env);
 
         if (lt_config["run_settings"]["envs"]) {
@@ -175,16 +185,16 @@ function sync_args_from_cmd(args) {
       lt_config["tunnel_settings"]["tunnel"] = false;
     }
 
-    if ("tunnelName" in args) {
+    if ("tunnel_name" in args) {
       if (!("tunnel_settings" in lt_config)) {
         lt_config["tunnel_settings"] = {};
       }
-      lt_config["tunnel_settings"]["tunnelName"] = args["tunnelName"];
+      lt_config["tunnel_settings"]["tunnel_name"] = args["tunnel_name"];
     } else if (!("tunnel_settings" in lt_config)) {
       lt_config["tunnel_settings"] = {};
-      lt_config["tunnel_settings"]["tunnelName"] = "";
-    } else if (!("tunnelName" in lt_config["tunnel_settings"])) {
-      lt_config["tunnel_settings"]["tunnelName"] = "";
+      lt_config["tunnel_settings"]["tunnel_name"] = "";
+    } else if (!("tunnel_name" in lt_config["tunnel_settings"])) {
+      lt_config["tunnel_settings"]["tunnel_name"] = "";
     }
 
     //add browsers from cli
@@ -219,7 +229,13 @@ function sync_args_from_cmd(args) {
     }
     if ("sync" in args) {
       lt_config["run_settings"]["sync"] = true ? args["sync"] == "true" : false;
+      if ("exit-on-failure" in args) {
+        lt_config["run_settings"]["exit-on-failure"] = true;
+      } else {
+        lt_config["run_settings"]["exit-on-failure"] = false;
+      }
     }
+
     if ("autostart" in args) {
       lt_config["tunnel_settings"]["autostart"] = true
         ? args["autostart"] == "true"
@@ -227,6 +243,21 @@ function sync_args_from_cmd(args) {
     } else {
       lt_config["tunnel_settings"]["autostart"] = true;
     }
+
+    if ("network" in args) {
+      lt_config["run_settings"]["network"] = true
+        ? args["network"] == "true"
+        : false;
+    } else if (!lt_config["run_settings"]["network"]) {
+      lt_config["run_settings"]["network"] = false;
+    }
+
+    if ("headless" in args) {
+      lt_config["run_settings"]["headless"] = args["headless"];
+    } else if (!lt_config["run_settings"]["headless"]) {
+      lt_config["run_settings"]["headless"] = false;
+    }
+
     //get specs from current directory if specs are not passed in config or cli
     if (
       (lt_config["run_settings"]["specs"] == undefined ||
